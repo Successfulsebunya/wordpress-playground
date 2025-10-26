@@ -30,7 +30,8 @@ RUN set -euxo pipefail;\
     wget \
     unzip \
     cmake \
-    python3
+    python3 \
+    npm
 
 # Install Emscripten from the repository. We'd use the official
 # Docker image, but there is no arm64 image available which makes
@@ -51,6 +52,13 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN git clone https://github.com/emscripten-core/emsdk.git && \
     ./emsdk/emsdk install 4.0.5 && \
     /root/emsdk/emsdk activate 4.0.5
+
+RUN rm -rf /root/emsdk/upstream/emscripten && \
+    git clone https://github.com/sbc100/emscripten.git /root/emsdk/upstream/emscripten && \
+    cd /root/emsdk/upstream/emscripten && \
+    git checkout main_module_static_v2
+
+RUN python3 /root/emsdk/upstream/emscripten/bootstrap.py
 
 RUN mkdir -p /root/lib/lib /root/lib/include /root/lib/share /root/lib/bin
 
