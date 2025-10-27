@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		base: mode === 'production' ? '/' : '/website-extras/',
+		assetsInclude: ['**/*.so'],
 
 		cacheDir:
 			'../../../node_modules/.vite/packages-playground-website-extras',
