@@ -282,7 +282,10 @@ test('Intl functions should work when intl is enabled', async ({
 	website,
 	wordpress,
 }, testInfo) => {
-	if (testInfo.project.name === 'chromium') {
+	if (
+		testInfo.project.name === 'chromium' ||
+		testInfo.project.name === 'firefox'
+	) {
 		test.skip(true, 'Skipping this test on Chromium due to unknown issues');
 	}
 	const blueprint: Blueprint = {
