@@ -189,7 +189,7 @@ RUN set -euxo pipefail; \
 	fi; \
 
 	if [ "$JSPI" = "yes" ]; then \
-		export EMCC_FLAGS="${EMCC_FLAGS} -sJSPI"; \
+		export EMCC_FLAGS="${EMCC_FLAGS} -sJSPI -sSUPPORT_LONGJMP=wasm -fwasm-exceptions"; \
 	else \
 		export EMCC_FLAGS="${EMCC_FLAGS} -sASYNCIFY -sASYNCIFY_ADVISE"; \
 	fi; \
