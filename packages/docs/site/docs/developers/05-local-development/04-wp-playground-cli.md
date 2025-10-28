@@ -197,7 +197,7 @@ npx @wp-playground/cli@latest server --mount=./wp-content:/wordpress/wp-content
 
 ## Verbosity and debugging
 
-The CLI supports different verbosity levels to control output, for `quiet`, `normal` and `debug` mode. The default mode is `normal`. For quiet mode, run the server with no output (useful for scripts and automation):
+The CLI supports different output verbosity levels for `quiet`, `normal` (default) and `debug` mode. Sometimes you want to hide all the stdout output, e.g. in a script or a CI automation. You can do that using the `--verbosity=quiet` option:
 
 ```bash
 npx @wp-playground/cli@latest server --verbosity=quiet
