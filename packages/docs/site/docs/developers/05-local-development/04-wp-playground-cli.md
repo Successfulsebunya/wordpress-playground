@@ -30,7 +30,7 @@ npx @wp-playground/cli@latest server
 
 With the previous command, you only get a fresh WordPress instance to test. Most developers will want to test their own work. To test a plugin or a theme, navigate to your project folder and run the CLI with the `--auto-mount` flag.
 
-The `--auto-mount` flag intelligently detects your project type and mounts it to the appropriate location in WordPress. When you run the command from your project directory, Playground CLI analyzes the directory structure and automatically determines whether you're working with a plugin, theme, wp-content directory, full WordPress installation, or static HTML/PHP files. It then mounts your project to the correct path in the virtual WordPress environment, so you can start developing immediately without manual configuration.
+The `--auto-mount` flag analyzes the directory structure and automatically determines whether you're working with a plugin, theme, wp-content directory, full WordPress installation, or static HTML/PHP files. It then mounts your project to the correct path in the virtual WordPress environment, so you can start developing immediately without manual configuration.
 
 ```bash
 cd my-plugin
