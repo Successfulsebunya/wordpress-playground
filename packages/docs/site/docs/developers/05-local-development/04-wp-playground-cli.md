@@ -103,7 +103,18 @@ npx @wp-playground/cli@latest server --mount-before-install=.:/wordpress/
 
 ### Symlink support for monorepos
 
-If you're working in a monorepo or complex project structure where packages are symlinked, you can enable symlink following:
+Sometimes you're working with a complex project structure where directories are symlinked to another location on the disk, e.g.:
+
+```
+/home/alex/my-project
+└── wp-content
+    └── plugins
+        ├── hello-dolly/                # regular directory
+        └── secret-plugin → /home/www/plugins/secret-plugin
+```  
+
+By default, Playground CLI only accesses the directories you explicitly mount and won't any load files from `/home/www/plugins/secret-plugin`. You can, however, explicitly instruct Playground CLI to follow that, and other, symlinks with the `--follow-symlink` option:
+     
 
 ```bash
 npx @wp-playground/cli@latest server \
