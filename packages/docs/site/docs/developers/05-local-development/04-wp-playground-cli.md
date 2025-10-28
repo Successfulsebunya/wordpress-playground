@@ -53,12 +53,6 @@ You can configure a custom site URL for your development environment, which is u
 npx @wp-playground/cli@latest server --site-url=https://my-local-dev.test
 ```
 
-You can also specify a custom port:
-
-```bash
-npx @wp-playground/cli@latest server --port=3000 --site-url=http://localhost:3000
-```
-
 ### Loading blueprints
 
 One way to take your Playground CLI development experience to the next level is to integrate with [Blueprints](/blueprints/getting-started/). For those unfamiliar with this technology, it allows developers to configure the initial state for their WordPress Playground instances.

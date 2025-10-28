@@ -83,14 +83,6 @@ Puedes configurar una URL de sitio personalizada para tu entorno de desarrollo, 
 npx @wp-playground/cli@latest server --site-url=https://my-local-dev.test
 ```
 
-<!-- You can also specify a custom port: -->
-
-También puedes especificar un puerto personalizado:
-
-```bash
-npx @wp-playground/cli@latest server --port=3000 --site-url=http://localhost:3000
-```
-
 <!-- ### Loading blueprints -->
 
 ### Cargar Blueprints
