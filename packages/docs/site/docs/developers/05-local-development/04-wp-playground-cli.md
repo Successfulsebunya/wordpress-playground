@@ -5,20 +5,19 @@ slug: /developers/local-development/wp-playground-cli
 
 # Playground CLI
 
-[@wp-playground/cli](https://www.npmjs.com/package/@wp-playground/cli) is a command-line tool that simplifies the WordPress development and testing flow.
-Playground CLI supports auto-mounting a directory with a plugin, theme, or WordPress installation. But if you need flexibility, the CLI supports mounting commands to personalize your local environment.
+[@wp-playground/cli](https://www.npmjs.com/package/@wp-playground/cli) is a command-line tool that simplifies the WordPress development and testing flow. You can use Playground CLI to auto-mount a directory with a plugin, theme, or WordPress installation. If you need flexibility, you can use mounting commands to personalize your local environment.
 
 **Key features:**
 
--   **Quick Setup**: Set up a local WordPress environment in seconds.
+-   **Quick setup**: Set up a local WordPress environment in seconds.
 -   **Flexibility**: Allows for configuration to adapt to different scenarios.
--   **Simple Environment**: No extra configuration, just a compatible Node version, and you are ready to use it.
+-   **Simple environment**: No extra configuration, just a compatible Node version, and you are ready to use it.
 
 ## Requirements
 
 The Playground CLI requires Node.js 20.18 or higher, which is the recommended Long-Term Support (LTS) version. You can download it from the [Node.js website](https://nodejs.org/en/download).
 
-## Quickstart
+## Quick start
 
 To run the Playground CLI, open a command line and use the following command:
 
@@ -35,7 +34,7 @@ cd my-plugin-or-theme-directory
 npx @wp-playground/cli@latest server --auto-mount
 ```
 
-### Choosing a WordPress and PHP Version
+### Choosing a WordPress and PHP version
 
 By default, the CLI loads the latest stable version of WordPress and PHP 8.3 due to its improved performance. To specify your preferred versions, you can use the flag `--wp=<version>` and `--php=<version>`:
 
@@ -43,11 +42,11 @@ By default, the CLI loads the latest stable version of WordPress and PHP 8.3 due
 npx @wp-playground/cli@latest server --wp=6.8 --php=8.3
 ```
 
-### Loading Blueprints
+### Loading blueprints
 
 One way to take your Playground CLI development experience to the next level is to integrate with [Blueprints](/blueprints/getting-started/). For those unfamiliar with this technology, it allows developers to configure the initial state for their WordPress Playground instances.
 
-Using the `--blueprint=<blueprint-address>` flag, developers can run a Playground with a custom initial state. We’ll use the example below to do this.
+Using the `--blueprint=<blueprint-address>` flag, developers can run a Playground with a custom initial state. We'll use the example below to do this.
 
 **(my-blueprint.json)**
 
@@ -88,7 +87,7 @@ npx @wp-playground/cli@latest server --mount-before-install=.:/wordpress/
 On Windows, the path format `/host/path:/vfs/path` can cause issues. To resolve this, use the flags `--mount-dir` and `--mount-dir-before-install`. These flags let you specify host and virtual file system paths in an alternative format`"/host/path"` `"/vfs/path"`.
 :::
 
-### Understanding Data Persistence and SQLite Location
+### Understanding data persistence and SQLite location
 
 By default, Playground CLI stores WordPress files and the SQLite database in **temporary directories on your operating system**:
 
@@ -99,7 +98,7 @@ By default, Playground CLI stores WordPress files and the SQLite database in **t
 └── tmp/              # Temporary PHP files
 ```
 
-**Finding Your Temp Directory:**
+**Finding your temp directory:**
 
 The actual location depends on your OS (these are examples or common possibilities):
 
@@ -125,7 +124,7 @@ Mount before WP install: /wordpress ->
 /private/var/folders/c8/mwz12ycx4s509056kby3hk180000gn/T/node-playground-cli-site-62926--62926-yQNOdvJVIgYC/wordpress
 ```
 
-**Where is the SQLite Database Stored?**
+**Where is the SQLite database stored?**
 
 The database location depends on what you mount:
 
@@ -141,10 +140,10 @@ The database location depends on what you mount:
 
 -   **Custom mounts**: Database location follows your mount configuration
 
-**Automatic Cleanup:**
+**Automatic cleanup:**
 Playground CLI automatically removes temp directories that are:
 
--   Older than 2 days
+-   Older than two days
 -   No longer associated with a running process
 
 **Recommendation:** To persist both your code and database when developing plugins or themes, mount the entire `wp-content` directory instead of just the plugin/theme folder.
@@ -157,9 +156,9 @@ cd my-wordpress-project
 npx @wp-playground/cli@latest server --mount=./wp-content:/wordpress/wp-content
 ```
 
-## Command and Arguments
+## Commands and arguments
 
-Playground CLI is simple, configurable, and unopinionated. You can set it up according
+The Playground CLI is simple, configurable, and unopinionated. You can set it up according
 to your unique WordPress setup. With the Playground CLI, you can use the following top-level commands:
 
 -   **`server`**: (Default) Starts a local WordPress server.
@@ -190,7 +189,7 @@ The `server` command supports the following optional arguments:
 -   `--internal-cookie-store`: Enable internal cookie handling. When enabled, Playground will manage cookies internally using an HttpCookieStore that persists cookies across requests. When disabled, cookies are handled externally (e.g., by a browser in Node.js environments). Defaults to false.
 -   `--xdebug`: Enable Xdebug. Defaults to false.
 -   `--experimental-devtools`: Enable experimental browser development tools. Defaults to false.
--   `--experimental-multi-worker=<number>`: Enable experimental multi-worker support which requires a `/wordpress` directory backed by a real filesystem. Pass a positive number to specify the number of workers to use. Otherwise, defaults to the number of CPUs minus 1.
+-   `--experimental-multi-worker=<number>`: Enable experimental multi-worker support which requires a `/wordpress` directory backed by a real file system. Pass a positive number to specify the number of workers to use. Otherwise, defaults to the number of CPUs minus one.
 
 :::caution
 With the flag `--follow-symlinks`, the following symlinks will expose files outside mounted directories to Playground and could be a security risk.
@@ -204,7 +203,7 @@ With the Playground CLI, you can use the `--help` flag to get the full list of a
 npx @wp-playground/cli@latest --help
 ```
 
-## Programmatic Usage with JavaScript
+## Programmatic usage with JavaScript
 
 The Playground CLI can also be controlled programmatically from your JavaScript/TypeScript code using the `runCLI` function. This gives you direct access to all CLI functionalities within your code, which is useful for automating end-to-end tests. Let's cover the basics of using `runCLI`.
 
@@ -225,9 +224,9 @@ cliServer = await runCLI({
 } as RunCLIArgs);
 ```
 
-To execute the code above, the developer can set their preferred method. A simple way to execute this code is to save it as a `.ts` file and run it with a tool like `tsx`. For example: `tsx my-script.ts`
+To execute the code above, you can set your preferred method. A simple way to execute this code is to save it as a `.ts` file and run it with a tool like `tsx`. For example: `tsx my-script.ts`
 
-### Setting a Blueprint
+### Setting a blueprint
 
 You can provide a blueprint in two ways: either as an object literal directly passed to the `blueprint` property, or as a string containing the path to an external `.json` file.
 
@@ -277,7 +276,7 @@ const myBlueprint: BlueprintDeclaration = {
 
 ### Mounting a plugin programmatically
 
-It is possible to mount local directories programmatically using `runCLI`. The options `mount` and `mount-before-install` are available. The `hostPath` property expects a path to a directory on your local machine. This path should be relative to where your script is being executed.
+You can mount local directories programmatically using `runCLI`. The options `mount` and `mount-before-install` are available. The `hostPath` property expects a path to a directory on your local machine. This path should be relative to where your script is being executed.
 
 ```TypeScript
 	cliServer = await runCLI({
@@ -292,7 +291,7 @@ It is possible to mount local directories programmatically using `runCLI`. The o
     });
 ```
 
-With those options we can combine mounting parts of the project with blueprints, for example:
+You can combine mounting parts of the project with blueprints, for example:
 
 ```TypeScript
 
