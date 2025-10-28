@@ -1,6 +1,7 @@
 ---
 title: Playground CLI
 slug: /developers/local-development/wp-playground-cli
+description: A command-line tool for WordPress development and testing with quick setup, flexible configuration, and minimal dependencies.
 ---
 
 # Playground CLI
