@@ -34,12 +34,65 @@ cd my-plugin-or-theme-directory
 npx @wp-playground/cli@latest server --auto-mount
 ```
 
+### Auto-mounting different project types
+
+The `--auto-mount` flag intelligently detects your project type and mounts it appropriately:
+
+**Plugin directory:**
+
+```bash
+cd my-plugin
+npx @wp-playground/cli@latest server --auto-mount
+```
+
+**Theme directory:**
+
+```bash
+cd my-theme
+npx @wp-playground/cli@latest server --auto-mount
+```
+
+**wp-content directory:**
+
+```bash
+cd my-site/wp-content
+npx @wp-playground/cli@latest server --auto-mount
+```
+
+**Full WordPress installation:**
+
+```bash
+cd my-wordpress
+npx @wp-playground/cli@latest server --auto-mount
+```
+
+**Static HTML/PHP project:**
+
+```bash
+cd my-static-site
+npx @wp-playground/cli@latest server --auto-mount
+```
+
 ### Choosing a WordPress and PHP version
 
 By default, the CLI loads the latest stable version of WordPress and PHP 8.3 due to its improved performance. To specify your preferred versions, you can use the flag `--wp=<version>` and `--php=<version>`:
 
 ```bash
 npx @wp-playground/cli@latest server --wp=6.8 --php=8.3
+```
+
+### Setting a custom site URL
+
+You can configure a custom site URL for your development environment, which is useful for testing domain-specific functionality or simulating production environments:
+
+```bash
+npx @wp-playground/cli@latest server --site-url=https://my-local-dev.test
+```
+
+You can also specify a custom port:
+
+```bash
+npx @wp-playground/cli@latest server --port=3000 --site-url=http://localhost:3000
 ```
 
 ### Loading blueprints
@@ -50,14 +103,11 @@ Using the `--blueprint=<blueprint-address>` flag, developers can run a Playgroun
 
 **(my-blueprint.json)**
 
-```bash
+```json
 {
-  "landingPage": "/wp-admin/options-general.php?page=akismet-key-config",
-  "login": true,
-  "plugins": [
-    "hello-dolly",
-    "https://raw.githubusercontent.com/adamziel/blueprints/trunk/docs/assets/hello-from-the-dashboard.zip"
-  ]
+	"landingPage": "/wp-admin/options-general.php?page=akismet-key-config",
+	"login": true,
+	"plugins": ["hello-dolly", "https://raw.githubusercontent.com/adamziel/blueprints/trunk/docs/assets/hello-from-the-dashboard.zip"]
 }
 ```
 
@@ -75,6 +125,16 @@ Some projects have a specific structure that requires a custom configuration; fo
 npx @wp-playground/cli@latest server --mount=.:/wordpress/wp-content/plugins/MY-PLUGIN-DIRECTORY
 ```
 
+**Multiple mounts:**
+
+You can mount multiple directories at once:
+
+```bash
+npx @wp-playground/cli@latest server \
+  --mount=./my-plugin:/wordpress/wp-content/plugins/my-plugin \
+  --mount=./my-theme:/wordpress/wp-content/themes/my-theme
+```
+
 ### Mounting before WordPress installation
 
 Consider mounting your WordPress project files before the WordPress installation begins. This approach is beneficial if you want to override the Playground boot process, as it can help connect Playground with `WP-CLI`. The `--mount-before-install` flag supports this process.
@@ -83,8 +143,18 @@ Consider mounting your WordPress project files before the WordPress installation
 npx @wp-playground/cli@latest server --mount-before-install=.:/wordpress/
 ```
 
-:::info
-On Windows, the path format `/host/path:/vfs/path` can cause issues. To resolve this, use the flags `--mount-dir` and `--mount-dir-before-install`. These flags let you specify host and virtual file system paths in an alternative format`"/host/path"` `"/vfs/path"`.
+### Symlink support for monorepos
+
+If you're working in a monorepo or complex project structure where packages are symlinked, you can enable symlink following:
+
+```bash
+npx @wp-playground/cli@latest server \
+  --follow-symlinks \
+  --mount-before-install=./packages/my-plugin:/wordpress/wp-content/plugins/my-plugin
+```
+
+:::caution
+Using `--follow-symlinks` can expose files outside mounted directories to Playground and could be a security risk. Only use this flag when you trust the symlink targets.
 :::
 
 ### Understanding data persistence and SQLite location
@@ -156,6 +226,20 @@ cd my-wordpress-project
 npx @wp-playground/cli@latest server --mount=./wp-content:/wordpress/wp-content
 ```
 
+## Verbosity and debugging
+
+The CLI supports different verbosity levels to control output, for `quiet`, `normal` and `debug` mode. The default mode is `normal`. For quiet mode, run the server with no output (useful for scripts and automation):
+
+```bash
+npx @wp-playground/cli@latest server --verbosity=quiet
+```
+
+Get detailed logging information for troubleshooting, with `debug` mode:
+
+```bash
+npx @wp-playground/cli@latest server --verbosity=debug
+```
+
 ## Commands and arguments
 
 The Playground CLI is simple, configurable, and unopinionated. You can set it up according
@@ -191,8 +275,8 @@ The `server` command supports the following optional arguments:
 -   `--experimental-devtools`: Enable experimental browser development tools. Defaults to false.
 -   `--experimental-multi-worker=<number>`: Enable experimental multi-worker support which requires a `/wordpress` directory backed by a real file system. Pass a positive number to specify the number of workers to use. Otherwise, defaults to the number of CPUs minus one.
 
-:::caution
-With the flag `--follow-symlinks`, the following symlinks will expose files outside mounted directories to Playground and could be a security risk.
+:::info
+On Windows, the path format `/host/path:/vfs/path` can cause issues. To resolve this, use the flags `--mount-dir` and `--mount-dir-before-install`. These flags let you specify host and virtual file system paths in an alternative format`"/host/path"` `"/vfs/path"`.
 :::
 
 ## Need some help with the CLI?
@@ -225,6 +309,65 @@ cliServer = await runCLI({
 ```
 
 To execute the code above, you can set your preferred method. A simple way to execute this code is to save it as a `.ts` file and run it with a tool like `tsx`. For example: `tsx my-script.ts`
+
+**Testing with specific PHP versions:**
+
+```TypeScript
+import { runCLI } from "@wp-playground/cli";
+
+const cliServer = await runCLI({
+  command: 'server',
+  php: '8.0',
+  skipWordPressSetup: true,
+  skipSqliteSetup: true,
+});
+
+// Test PHP version
+await cliServer.playground.writeFile(
+  '/wordpress/version.php',
+  '<?php echo phpversion(); ?>'
+);
+
+const versionUrl = new URL('/version.php', cliServer.serverUrl);
+const response = await fetch(versionUrl);
+const version = await response.text();
+console.log('PHP Version:', version); // Outputs: 8.0.x
+```
+
+### Setting a custom site URL programmatically
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  'site-url': 'https://my-staging.example.com',
+  port: 9500
+});
+
+// Verify site URL is set correctly
+await cliServer.playground.writeFile(
+  '/wordpress/check-url.php',
+  '<?php require_once "/wordpress/wp-load.php"; echo get_option("siteurl"); ?>'
+);
+
+const checkUrl = new URL('/check-url.php', cliServer.serverUrl);
+const response = await fetch(checkUrl);
+console.log('Site URL:', await response.text());
+```
+
+### Controlling verbosity programmatically
+
+```TypeScript
+import { runCLI } from "@wp-playground/cli";
+import { logger } from '@php-wasm/logger';
+
+const cliServer = await runCLI({
+  command: 'server',
+  verbosity: 'debug' // or 'quiet' or 'normal'
+});
+
+// Add custom logging
+logger.debug('Custom debug message');
+```
 
 ### Setting a blueprint
 
@@ -279,22 +422,38 @@ const myBlueprint: BlueprintDeclaration = {
 You can mount local directories programmatically using `runCLI`. The options `mount` and `mount-before-install` are available. The `hostPath` property expects a path to a directory on your local machine. This path should be relative to where your script is being executed.
 
 ```TypeScript
-	cliServer = await runCLI({
-      command: 'server',
-      login: true,
-      'mount-before-install': [
-        {
-          hostPath: './[my-plugin-local-path]',
-          vfsPath: '/wordpress/wp-content/plugins/my-plugin',
-        },
-      ],
-    });
+cliServer = await runCLI({
+  command: 'server',
+  login: true,
+  'mount-before-install': [
+    {
+      hostPath: './[my-plugin-local-path]',
+      vfsPath: '/wordpress/wp-content/plugins/my-plugin',
+    },
+  ],
+});
 ```
+
+**Auto-mounting programmatically:**
+
+```TypeScript
+import { runCLI } from "@wp-playground/cli";
+import process from 'node:process';
+
+// Change to your project directory
+process.chdir('./my-plugin');
+
+const cliServer = await runCLI({
+  command: 'server',
+  autoMount: '' // Empty string triggers auto-detection
+});
+```
+
+### Combining mounts with blueprints
 
 You can combine mounting parts of the project with blueprints, for example:
 
 ```TypeScript
-
 import { runCLI, RunCLIArgs, RunCLIServer } from "@wp-playground/cli";
 
 let cliServer: RunCLIServer;
@@ -320,3 +479,325 @@ cliServer = await runCLI({
     }
 } as RunCLIArgs);
 ```
+
+**Multiple mounts with blueprints:**
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  mount: [
+    {
+      hostPath: './my-plugin',
+      vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+    },
+    {
+      hostPath: './my-theme',
+      vfsPath: '/wordpress/wp-content/themes/my-theme'
+    }
+  ],
+  blueprint: {
+    steps: [
+      {
+        step: 'activatePlugin',
+        pluginPath: '/wordpress/wp-content/plugins/my-plugin/plugin.php'
+      },
+      {
+        step: 'activateTheme',
+        themeFolderName: 'my-theme'
+      }
+    ]
+  }
+});
+```
+
+**Complex blueprint with multiple configurations:**
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  php: '8.3',
+  wp: 'latest',
+  login: true,
+  mount: [
+    {
+      hostPath: './my-plugin',
+      vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+    }
+  ],
+  blueprint: {
+    landingPage: '/wp-admin/plugins.php',
+    steps: [
+      {
+        step: 'activatePlugin',
+        pluginPath: '/wordpress/wp-content/plugins/my-plugin/plugin.php'
+      },
+      {
+        step: 'setSiteOptions',
+        options: {
+          blogname: 'Plugin Test Site',
+          permalink_structure: '/%postname%/'
+        }
+      },
+      {
+        step: 'runPHP',
+        code: '<?php update_option("my_plugin_setting", "test_value"); ?>'
+      }
+    ]
+  }
+});
+```
+
+### Mode selection (Blueprint v2)
+
+You can specify different modes when working with Blueprint v2:
+
+**Creating a new site:**
+
+```TypeScript
+import { runCLI } from "@wp-playground/cli";
+
+const cliServer = await runCLI({
+  command: 'server',
+  'experimental-blueprints-v2-runner': true,
+  mode: 'create-new-site',
+  'mount-before-install': [
+    {
+      hostPath: './my-new-site',
+      vfsPath: '/wordpress'
+    }
+  ]
+});
+```
+
+**Applying to an existing site:**
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  'experimental-blueprints-v2-runner': true,
+  mode: 'apply-to-existing-site',
+  'mount-before-install': [
+    {
+      hostPath: './existing-wordpress',
+      vfsPath: '/wordpress'
+    }
+  ],
+  blueprint: {
+    steps: [
+      {
+        step: 'setSiteOptions',
+        options: {
+          blogname: 'Updated Site Name'
+        }
+      }
+    ]
+  }
+});
+```
+
+## Automated testing
+
+### Integration testing with Vitest
+
+The programmatic API is excellent for automated testing. Here's a complete example using Vitest:
+
+```TypeScript
+import { describe, test, expect, afterEach } from 'vitest';
+import { runCLI, RunCLIServer } from "@wp-playground/cli";
+
+describe('My Plugin Tests', () => {
+  let cliServer: RunCLIServer;
+
+  afterEach(async () => {
+    if (cliServer) {
+      await cliServer[Symbol.asyncDispose]();
+    }
+  });
+
+  test('plugin activates successfully', async () => {
+    cliServer = await runCLI({
+      command: 'server',
+      mount: [
+        {
+          hostPath: './my-plugin',
+          vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+        }
+      ],
+      blueprint: {
+        steps: [
+          {
+            step: 'activatePlugin',
+            pluginPath: '/wordpress/wp-content/plugins/my-plugin/plugin.php'
+          }
+        ]
+      }
+    });
+
+    const homeUrl = new URL('/', cliServer.serverUrl);
+    const response = await fetch(homeUrl);
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('My Plugin');
+  });
+
+  test('plugin settings page loads', async () => {
+    cliServer = await runCLI({
+      command: 'server',
+      login: true, // Auto-login as admin
+      mount: [
+        {
+          hostPath: './my-plugin',
+          vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+        }
+      ],
+      blueprint: {
+        steps: [
+          {
+            step: 'activatePlugin',
+            pluginPath: '/wordpress/wp-content/plugins/my-plugin/plugin.php'
+          }
+        ]
+      }
+    });
+
+    const settingsUrl = new URL(
+      '/wp-admin/options-general.php?page=my-plugin',
+      cliServer.serverUrl
+    );
+    const response = await fetch(settingsUrl);
+
+    expect(response.status).toBe(200);
+  });
+});
+```
+
+### Testing theme customizations
+
+```TypeScript
+test('theme displays custom header', async () => {
+  cliServer = await runCLI({
+    command: 'server',
+    mount: [
+      {
+        hostPath: './my-theme',
+        vfsPath: '/wordpress/wp-content/themes/my-theme'
+      }
+    ],
+    blueprint: {
+      steps: [
+        {
+          step: 'installTheme',
+          themeData: {
+            resource: 'vfs',
+            path: '/wordpress/wp-content/themes/my-theme'
+          }
+        },
+        {
+          step: 'activateTheme',
+          themeFolderName: 'my-theme'
+        }
+      ]
+    }
+  });
+
+  const homeUrl = new URL('/', cliServer.serverUrl);
+  const response = await fetch(homeUrl);
+  const html = await response.text();
+
+  expect(html).toContain('<header class="site-header">');
+});
+```
+
+### Testing a plugin with different WordPress/PHP versions
+
+```TypeScript
+test('plugin works with WordPress 6.4 and PHP 8.0', async () => {
+  cliServer = await runCLI({
+    command: 'server',
+    php: '8.0',
+    wp: '6.4',
+    mount: [
+      {
+        hostPath: './my-plugin',
+        vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+      }
+    ],
+    blueprint: {
+      steps: [
+        {
+          step: 'activatePlugin',
+          pluginPath: '/wordpress/wp-content/plugins/my-plugin/plugin.php'
+        }
+      ]
+    }
+  });
+
+  const homeUrl = new URL('/', cliServer.serverUrl);
+  const response = await fetch(homeUrl);
+
+  expect(response.status).toBe(200);
+});
+```
+
+## Advanced configuration
+
+### Skip WordPress and SQLite setup
+
+When you only need to test PHP code without WordPress, you can skip the setup for faster testing:
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  skipWordPressSetup: true,
+  skipSqliteSetup: true,
+  php: '8.3'
+});
+
+// Write and test custom PHP scripts
+await cliServer.playground.writeFile(
+  '/wordpress/test.php',
+  '<?php echo "Hello from PHP!"; ?>'
+);
+
+const testUrl = new URL('/test.php', cliServer.serverUrl);
+const response = await fetch(testUrl);
+console.log(await response.text()); // Outputs: Hello from PHP!
+```
+
+### Error handling
+
+```TypeScript
+import { runCLI } from "@wp-playground/cli";
+
+try {
+  const cliServer = await runCLI({
+    command: 'server',
+    debug: true // Enable PHP error logging
+  });
+
+  // Your test code here
+
+} catch (error) {
+  console.error('Server failed to start:', error);
+}
+```
+
+### Following symlinks programmatically
+
+```TypeScript
+const cliServer = await runCLI({
+  command: 'server',
+  followSymlinks: true,
+  'mount-before-install': [
+    {
+      hostPath: './symlinked-directory',
+      vfsPath: '/wordpress/wp-content/plugins/my-plugin'
+    }
+  ]
+});
+```
+
+:::caution
+Using symlinks can expose files outside mounted directories. Only enable this feature when you trust the symlink targets.
+:::
