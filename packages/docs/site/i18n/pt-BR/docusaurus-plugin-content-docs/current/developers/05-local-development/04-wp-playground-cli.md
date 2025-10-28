@@ -46,65 +46,16 @@ npx @wp-playground/cli@latest server
 
 ![Playground CLI em Ação](@site/static/img/developers/npx-wp-playground-server.gif)
 
-<!-- With the previous command, you only get a fresh WordPress instance to test. Most developers will want to test their own work. To test a plugin or a theme, navigate to your project folder and run the CLI with the `--auto-mount` flag: -->
+<!-- With the previous command, you only get a fresh WordPress instance to test. Most developers will want to test their own work. To test a plugin or a theme, navigate to your project folder and run the CLI with the `--auto-mount` flag. -->
 
-Com o comando anterior, você obtém apenas uma instância WordPress fresca para testar. A maioria dos desenvolvedores vai querer testar seu próprio trabalho. Para testar um plugin ou tema, navegue até a pasta do seu projeto e execute o CLI com a flag `--auto-mount`:
+Com o comando anterior, você obtém apenas uma instância WordPress fresca para testar. A maioria dos desenvolvedores vai querer testar seu próprio trabalho. Para testar um plugin ou tema, navegue até a pasta do seu projeto e execute o CLI com a flag `--auto-mount`.
 
-```bash
-cd my-plugin-or-theme-directory
-npx @wp-playground/cli@latest server --auto-mount
-```
+<!-- The `--auto-mount` flag intelligently detects your project type and mounts it to the appropriate location in WordPress. When you run the command from your project directory, Playground CLI analyzes the directory structure and automatically determines whether you're working with a plugin, theme, wp-content directory, full WordPress installation, or static HTML/PHP files. It then mounts your project to the correct path in the virtual WordPress environment, so you can start developing immediately without manual configuration. -->
 
-<!-- ### Auto-mounting different project types -->
-
-### Auto-montagem de diferentes tipos de projetos
-
-<!-- The `--auto-mount` flag intelligently detects your project type and mounts it appropriately: -->
-
-A flag `--auto-mount` detecta inteligentemente o tipo do seu projeto e o monta apropriadamente:
-
-<!-- **Plugin directory:** -->
-
-**Diretório de plugin:**
+A flag `--auto-mount` detecta inteligentemente o tipo do seu projeto e o monta no local apropriado no WordPress. Quando você executa o comando do diretório do seu projeto, o Playground CLI analisa a estrutura do diretório e determina automaticamente se você está trabalhando com um plugin, tema, diretório wp-content, instalação completa do WordPress ou arquivos estáticos HTML/PHP. Ele então monta seu projeto no caminho correto no ambiente WordPress virtual, para que você possa começar a desenvolver imediatamente sem configuração manual.
 
 ```bash
 cd my-plugin
-npx @wp-playground/cli@latest server --auto-mount
-```
-
-<!-- **Theme directory:** -->
-
-**Diretório de tema:**
-
-```bash
-cd my-theme
-npx @wp-playground/cli@latest server --auto-mount
-```
-
-<!-- **wp-content directory:** -->
-
-**Diretório wp-content:**
-
-```bash
-cd my-site/wp-content
-npx @wp-playground/cli@latest server --auto-mount
-```
-
-<!-- **Full WordPress installation:** -->
-
-**Instalação completa do WordPress:**
-
-```bash
-cd my-wordpress
-npx @wp-playground/cli@latest server --auto-mount
-```
-
-<!-- **Static HTML/PHP project:** -->
-
-**Projeto estático HTML/PHP:**
-
-```bash
-cd my-static-site
 npx @wp-playground/cli@latest server --auto-mount
 ```
 
@@ -112,12 +63,12 @@ npx @wp-playground/cli@latest server --auto-mount
 
 ### Escolhendo uma Versão do WordPress e PHP
 
-<!-- By default, the CLI loads the latest stable version of WordPress and PHP 8.3 due to its improved performance. To specify your preferred versions, you can use the flag `--wp=<version>` and `--php=<version>`: -->
+<!-- By default, the CLI loads the latest stable version of WordPress and PHP 8.3 due to its improved performance. You can specify different versions using the `--wp=<version>` and `--php=<version>` flags. This is particularly useful when you need to test your plugin or theme for compatibility across different WordPress and PHP versions, ensuring your code works correctly for users running older installations. -->
 
-Por padrão, o CLI carrega a versão estável mais recente do WordPress e PHP 8.3 devido ao seu desempenho melhorado. Para especificar suas versões preferidas, você pode usar as flags `--wp=<version>` e `--php=<version>`:
+Por padrão, o CLI carrega a versão estável mais recente do WordPress e PHP 8.3 devido ao seu desempenho melhorado. Você pode especificar versões diferentes usando as flags `--wp=<version>` e `--php=<version>`. Isso é particularmente útil quando você precisa testar seu plugin ou tema para compatibilidade em diferentes versões do WordPress e PHP, garantindo que seu código funcione corretamente para usuários executando instalações mais antigas.
 
 ```bash
-npx @wp-playground/cli@latest server --wp=6.8 --php=8.3
+npx @wp-playground/cli@latest server --wp=6.4 --php=8.0
 ```
 
 <!-- ### Setting a custom site URL -->
