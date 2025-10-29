@@ -2197,7 +2197,7 @@ RUN set -euxo pipefail; \
 		# ensures the runtime is compatible with Web Workers as well.
 		ENVIRONMENT="$EMSCRIPTEN_ENVIRONMENT,worker"; \
 	fi; \
-	emcc $OPTIMIZATION_FLAGS \
+	emcc -fPIC $OPTIMIZATION_FLAGS \
 	--js-library /root/phpwasm-emscripten-library.js \
 	--js-library /root/phpwasm-emscripten-library-dynamic-linking.js \
 	--js-library /root/phpwasm-emscripten-library-known-undefined-functions.js \
