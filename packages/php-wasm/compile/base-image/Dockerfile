@@ -30,12 +30,7 @@ RUN set -euxo pipefail;\
     wget \
     unzip \
     cmake \
-    python3 \
-    # NOTE: Temporary use PR #25522 version of Emscripten
-    # to build php.wasm with MAIN_MODULE=2 ensurnig
-    # correct build without increasing binary size.
-    # npm required to run emscripten/bootstrap.py
-    npm
+    python3
 
 # Install Emscripten from the repository. We'd use the official
 # Docker image, but there is no arm64 image available which makes
@@ -57,19 +52,14 @@ RUN git clone https://github.com/emscripten-core/emsdk.git && \
     ./emsdk/emsdk install 4.0.5 && \
     /root/emsdk/emsdk activate 4.0.5
 
-# NOTE: Temporary use PR #25522 version of Emscripten
-# to build php.wasm with MAIN_MODULE=2 ensurnig
+# NOTE: Use of Emscripten PR #25522 patch
+# to build php.wasm with MAIN_MODULE ensuring
 # correct build without increasing binary size.
-RUN rm -rf /root/emsdk/upstream/emscripten && \
-    git clone https://github.com/sbc100/emscripten.git /root/emsdk/upstream/emscripten && \
-    cd /root/emsdk/upstream/emscripten && \
-    git checkout main_module_static_v2
-
-# NOTE: Temporary use PR #25522 version of Emscripten
-# to build php.wasm with MAIN_MODULE=2 ensurnig
-# correct build without increasing binary size.
-# running bootstrap.py to install npm packages.
-RUN python3 /root/emsdk/upstream/emscripten/bootstrap.py
+COPY ./main_module_without_relocatable.patch /root/main_module_without_relocatable.patch
+RUN cd /root/emsdk/upstream/emscripten && \
+    git init && \
+    git config --global --add safe.directory /root/emsdk/upstream/emscripten && \
+    git apply --verbose /root/main_module_without_relocatable.patch
 
 RUN mkdir -p /root/lib/lib /root/lib/include /root/lib/share /root/lib/bin
 

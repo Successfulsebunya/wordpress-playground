@@ -1,0 +1,643 @@
+diff --git a/embuilder.py b/embuilder.py
+index e93e0471f..5a2d80761 100755
+--- a/embuilder.py
++++ b/embuilder.py
+@@ -117,6 +117,7 @@ MINIMAL_PIC_TASKS = MINIMAL_TASKS + [
+     'crtbegin',
+     'libsanitizer_common_rt',
+     'libubsan_rt',
++    'libwasm_workers-debug',
+     'libwasm_workers-debug-stub',
+     'libfetch',
+     'libfetch-mt',
+diff --git a/emcc.py b/emcc.py
+index 24e849b5b..088ecbd21 100644
+--- a/emcc.py
++++ b/emcc.py
+@@ -823,7 +823,7 @@ def phase_setup(options, state):
+             'unused-command-line-argument',
+             "linker flag ignored during compilation: '%s'" % arg)
+
+-  if settings.MAIN_MODULE or settings.SIDE_MODULE:
++  if settings.SIDE_MODULE:
+     settings.RELOCATABLE = 1
+
+   if 'USE_PTHREADS' in user_settings:
+diff --git a/src/jsifier.mjs b/src/jsifier.mjs
+index dc5d697d8..7a0a34a3a 100644
+--- a/src/jsifier.mjs
++++ b/src/jsifier.mjs
+@@ -116,7 +116,7 @@ function isDefined(symName) {
+   }
+   // 'invoke_' symbols are created at runtime in library_dylink.py so can
+   // always be considered as defined.
+-  if (RELOCATABLE && symName.startsWith('invoke_')) {
++  if ((MAIN_MODULE || RELOCATABLE) && symName.startsWith('invoke_')) {
+     return true;
+   }
+   return false;
+@@ -506,7 +506,7 @@ function(${args}) {
+       if (!LibraryManager.library.hasOwnProperty(symbol)) {
+         const isWeakImport = WEAK_IMPORTS.has(symbol);
+         if (!isDefined(symbol) && !isWeakImport) {
+-          if (PROXY_TO_PTHREAD && !MAIN_MODULE && symbol == '__main_argc_argv') {
++          if (PROXY_TO_PTHREAD && !(MAIN_MODULE || RELOCATABLE) && symbol == '__main_argc_argv') {
+             error('PROXY_TO_PTHREAD proxies main() for you, but no main exists');
+             return;
+           }
+@@ -532,15 +532,8 @@ function(${args}) {
+             warn('To build in STANDALONE_WASM mode without a main(), use emcc --no-entry');
+           }
+         }
+-        if (!RELOCATABLE) {
+-          // emit a stub that will fail at runtime
+-          LibraryManager.library[symbol] = new Function(`abort('missing function: ${symbol}');`);
+-          // We have already warned/errored about this function, so for the purposes of Closure use, mute all type checks
+-          // regarding this function, marking ot a variadic function that can take in anything and return anything.
+-          // (not useful to warn/error multiple times)
+-          LibraryManager.library[symbol + '__docs'] = '/** @type {function(...*):?} */';
+-          isStub = true;
+-        } else {
++
++        if (RELOCATABLE || MAIN_MODULE) {
+           // Create a stub for this symbol which can later be replaced by the
+           // dynamic linker.  If this stub is called before the symbol is
+           // resolved assert in debug builds or trap in release builds.
+@@ -684,8 +677,8 @@ function(${args}) {
+           contentText += `\nModule['${mangled}'] = ${mangled};`;
+         }
+       }
+-      // Relocatable code needs signatures to create proper wrappers.
+-      if (sig && RELOCATABLE) {
++      // Dynamic linking needs signatures to create proper wrappers.
++      if (sig && (MAIN_MODULE || RELOCATABLE)) {
+         if (!WASM_BIGINT) {
+           sig = sig[0].replace('j', 'i') + sig.slice(1).replace(/j/g, 'ii');
+         }
+@@ -696,7 +689,7 @@ function(${args}) {
+       }
+       if (isStub) {
+         contentText += `\n${mangled}.stub = true;`;
+-        if (ASYNCIFY && MAIN_MODULE) {
++        if (ASYNCIFY && (MAIN_MODULE || RELOCATABLE)) {
+           contentText += `\nasyncifyStubs['${symbol}'] = undefined;`;
+         }
+       }
+diff --git a/src/lib/libcore.js b/src/lib/libcore.js
+index daaa2bea8..f4d470b1a 100644
+--- a/src/lib/libcore.js
++++ b/src/lib/libcore.js
+@@ -2164,7 +2164,7 @@ addToLibrary({
+ #endif
+   },
+
+-#if RELOCATABLE
++#if (MAIN_MODULE || RELOCATABLE)
+   // Globals that are normally exported from the wasm module but in relocatable
+   // mode are created here and imported by the module.
+   __stack_pointer: "new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true}, {{{ to64(STACK_HIGH) }}})",
+@@ -2194,11 +2194,12 @@ addToLibrary({
+ #if SUPPORT_LONGJMP == 'wasm'
+   __c_longjmp: "new WebAssembly.Tag({'parameters': ['{{{ POINTER_WASM_TYPE }}}']})",
+ #endif
++
+ #if ASYNCIFY == 1
+   __asyncify_state: "new WebAssembly.Global({'value': 'i32', 'mutable': true}, 0)",
+   __asyncify_data: "new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true}, {{{ to64(0) }}})",
+ #endif
+-#endif
++#endif // RELOCATABLE
+
+   _emscripten_fs_load_embedded_files__deps: ['$FS', '$PATH'],
+   _emscripten_fs_load_embedded_files: (ptr) => {
+@@ -2257,7 +2258,7 @@ addToLibrary({
+   $getNativeTypeSize: {{{ getNativeTypeSize }}},
+
+   $wasmTable__docs: '/** @type {WebAssembly.Table} */',
+-#if RELOCATABLE
++#if (MAIN_MODULE || RELOCATABLE)
+   // In RELOCATABLE mode we create the table in JS.
+   $wasmTable: `=new WebAssembly.Table({
+   'initial': {{{ toIndexType(INITIAL_TABLE) }}},
+diff --git a/src/lib/libdylink.js b/src/lib/libdylink.js
+index af499dc56..d0ddbc61d 100644
+--- a/src/lib/libdylink.js
++++ b/src/lib/libdylink.js
+@@ -6,8 +6,8 @@
+  * Dynamic library loading
+  */
+
+-#if !RELOCATABLE
+-#error "library_dylink.js requires RELOCATABLE"
++#if !MAIN_MODULE && !RELOCATABLE
++#error "library_dylink.js requires MAIN_MODULE or RELOCATABLE"
+ #endif
+
+ var LibraryDylink = {
+@@ -161,7 +161,7 @@ var LibraryDylink = {
+     get(obj, symName) {
+       var rtn = GOT[symName];
+       if (!rtn) {
+-        rtn = GOT[symName] = new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true});
++        rtn = GOT[symName] = new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true}, {{{ to64(-1) }}});
+ #if DYLINK_DEBUG == 2
+         dbg("new GOT entry: " + symName);
+ #endif
+@@ -180,6 +180,11 @@ var LibraryDylink = {
+   $isInternalSym: (symName) => {
+     // TODO: find a way to mark these in the binary or avoid exporting them.
+     return [
++      'memory',
++      '__memory_base',
++      '__table_base',
++      '__stack_pointer',
++      '__indirect_function_table',
+       '__cpp_exception',
+       '__c_longjmp',
+       '__wasm_apply_data_relocs',
+@@ -204,6 +209,7 @@ var LibraryDylink = {
+
+   $updateGOT__internal: true,
+   $updateGOT__deps: ['$GOT', '$isInternalSym', '$addFunction', '$getFunctionAddress'],
++  $updateGOT__docs: '/** @param {boolean=} replace */',
+   $updateGOT: (exports, replace) => {
+ #if DYLINK_DEBUG
+     dbg("updateGOT: adding " + Object.keys(exports).length + " symbols");
+@@ -221,24 +227,30 @@ var LibraryDylink = {
+       }
+ #endif
+
+-      GOT[symName] ||= new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true});
+-      if (replace || GOT[symName].value == 0) {
++
++      var existingEntry = GOT[symName] && GOT[symName].value != {{{ to64(-1) }}};
++      if (replace || !existingEntry) {
+ #if DYLINK_DEBUG == 2
+         dbg(`updateGOT: before: ${symName} : ${GOT[symName].value}`);
+ #endif
++        var newValue;
+         if (typeof value == 'function') {
+-          GOT[symName].value = {{{ to64('addFunction(value)') }}};
++          newValue = {{{ to64('addFunction(value)') }}};
+ #if DYLINK_DEBUG == 2
+           dbg(`updateGOT: FUNC: ${symName} : ${GOT[symName].value}`);
+ #endif
+         } else if (typeof value == {{{ POINTER_JS_TYPE }}}) {
+-          GOT[symName].value = value;
++          newValue = value;
+         } else {
+-          err(`unhandled export type for '${symName}': ${typeof value}`);
++          // The GOT can only contain addresses (i.e data addresses or function
++          // addresses so we currently ignore other types export here.
++          continue;
+         }
+ #if DYLINK_DEBUG == 2
+         dbg(`updateGOT:  after: ${symName} : ${GOT[symName].value} (${value})`);
+ #endif
++        GOT[symName] ??= new WebAssembly.Global({'value': '{{{ POINTER_WASM_TYPE }}}', 'mutable': true});
++        GOT[symName].value = newValue;
+       }
+ #if DYLINK_DEBUG
+       else if (GOT[symName].value != value) {
+@@ -253,9 +265,8 @@ var LibraryDylink = {
+
+   // Applies relocations to exported things.
+   $relocateExports__internal: true,
+-  $relocateExports__deps: ['$updateGOT'],
+-  $relocateExports__docs: '/** @param {boolean=} replace */',
+-  $relocateExports: (exports, memoryBase, replace) => {
++  $relocateExports__deps: [],
++  $relocateExports: (exports, memoryBase = 0) => {
+     var relocated = {};
+
+     for (var e in exports) {
+@@ -277,7 +288,6 @@ var LibraryDylink = {
+       }
+       relocated[e] = value;
+     }
+-    updateGOT(relocated, replace);
+     return relocated;
+   },
+
+@@ -288,13 +298,14 @@ var LibraryDylink = {
+     dbg('reportUndefinedSymbols');
+ #endif
+     for (var [symName, entry] of Object.entries(GOT)) {
+-      if (entry.value == 0) {
++      if (entry.value == {{{ to64(-1) }}}) {
+         var value = resolveGlobalSymbol(symName, true).sym;
+         if (!value && !entry.required) {
+           // Ignore undefined symbols that are imported as weak.
+ #if DYLINK_DEBUG
+           dbg(`ignoring undefined weak symbol: ${symName}`);
+ #endif
++          entry.value = {{{ to64(0) }}};
+           continue;
+         }
+ #if ASSERTIONS
+@@ -363,7 +374,7 @@ var LibraryDylink = {
+   // Allocate memory even if malloc isn't ready yet.  The allocated memory here
+   // must be zero initialized since its used for all static data, including bss.
+   $getMemory__noleakcheck: true,
+-  $getMemory__deps: ['$GOT', '__heap_base', '$alignMemory', 'calloc'],
++  $getMemory__deps: ['$GOT', '__heap_base', '$alignMemory', 'calloc', 'emscripten_get_sbrk_ptr'],
+   $getMemory: (size) => {
+     // After the runtime is initialized, we must only use sbrk() normally.
+ #if DYLINK_DEBUG
+@@ -382,7 +393,25 @@ var LibraryDylink = {
+     assert(end <= HEAP8.length, 'failure to getMemory - memory growth etc. is not supported there, call malloc/sbrk directly or increase INITIAL_MEMORY');
+ #endif
+     ___heap_base = end;
++
++    // After allocating the memory from the start the heap we need to ensure
++    // that once the program starts it doesn't use this region.  In relocatable
++    // mode we can just updat ethe __heap_base symbol that we are exporting to
++    // the main module.
++    // When not relocatable `__heap_base` is fixed and exported by the main
++    // module, but we can update the `sbrk_ptr` value instead.
++#if RELOCATABLE
+     GOT['__heap_base'].value = {{{ to64('end') }}};
++#else
++#if PTHREADS
++    if (!ENVIRONMENT_IS_PTHREAD) {
++#endif
++      var sbrk_ptr = _emscripten_get_sbrk_ptr();
++      {{{ makeSetValue('sbrk_ptr', 0, 'end', '*') }}}
++#if PTHREADS
++    }
++#endif
++#endif
+     return ret;
+   },
+
+@@ -592,7 +621,7 @@ var LibraryDylink = {
+     * @param {number=} handle
+     */`,
+   $loadWebAssemblyModule__deps: [
+-    '$loadDynamicLibrary', '$getMemory',
++    '$loadDynamicLibrary', '$getMemory', '$updateGOT',
+     '$relocateExports', '$resolveGlobalSymbol', '$GOTHandler',
+     '$getDylinkMetadata', '$alignMemory',
+     '$currentModuleWeakSymbols',
+@@ -757,6 +786,7 @@ var LibraryDylink = {
+         // add new entries to functionsInTableMap
+         updateTableMap(tableBase, metadata.tableSize);
+         moduleExports = relocateExports(instance.exports, memoryBase);
++        updateGOT(moduleExports);
+ #if ASYNCIFY
+         moduleExports = Asyncify.instrumentWasmExports(moduleExports);
+ #endif
+diff --git a/src/lib/libglemu.js b/src/lib/libglemu.js
+index 3adebf9e3..318051934 100644
+--- a/src/lib/libglemu.js
++++ b/src/lib/libglemu.js
+@@ -10,7 +10,7 @@ assert(!FULL_ES3, 'cannot emulate both ES3 and legacy GL');
+
+ {{{
+   const copySigs = (func) => {
+-    if (!RELOCATABLE) return '';
++    if (!MAIN_MODULE && !RELOCATABLE) return '';
+     return ` _${func}.sig = _emscripten_${func}.sig = orig_${func}.sig;`;
+   };
+   const fromPtr = (arg) => {
+diff --git a/src/lib/libpthread.js b/src/lib/libpthread.js
+index badc55104..7727a069c 100644
+--- a/src/lib/libpthread.js
++++ b/src/lib/libpthread.js
+@@ -581,7 +581,7 @@ var LibraryPThread = {
+       }
+       var tlsExports = {};
+       metadata.tlsExports.forEach((s) => tlsExports[s] = moduleExports[s]);
+-      relocateExports(tlsExports, __tls_base, /*replace=*/true);
++      updateGOT(relocateExports(tlsExports, __tls_base), /*replace=*/true);
+     }
+
+     // Register this function so that its gets called for each thread on
+diff --git a/src/lib/libwasm_worker.js b/src/lib/libwasm_worker.js
+index 474005679..d5b707dcf 100644
+--- a/src/lib/libwasm_worker.js
++++ b/src/lib/libwasm_worker.js
+@@ -25,7 +25,7 @@
+ #if LINKABLE
+ #error "-sLINKABLE is not supported with -sWASM_WORKERS"
+ #endif
+-#if RELOCATABLE
++#if RELOCATABLE || MAIN_MODULE
+ #error "dynamic linking is not supported with -sWASM_WORKERS"
+ #endif
+ #if PROXY_TO_WORKER
+diff --git a/src/modules.mjs b/src/modules.mjs
+index 4c46afa0b..b267cb2d6 100644
+--- a/src/modules.mjs
++++ b/src/modules.mjs
+@@ -90,7 +90,7 @@ function calculateLibraries() {
+     libraries.push('libsyscall.js');
+   }
+
+-  if (RELOCATABLE) {
++  if (MAIN_MODULE || RELOCATABLE) {
+     libraries.push('libdylink.js');
+   }
+
+diff --git a/src/preamble.js b/src/preamble.js
+index 33c67b9cc..3fc949a35 100644
+--- a/src/preamble.js
++++ b/src/preamble.js
+@@ -14,7 +14,7 @@
+ // An online HTML version (which may be of a different version of Emscripten)
+ //    is up at http://kripken.github.io/emscripten-site/docs/api_reference/preamble.js.html
+
+-#if RELOCATABLE
++#if MAIN_MODULE
+ {{{ makeModuleReceiveWithVar('dynamicLibraries', undefined, '[]', true) }}}
+ #endif
+
+@@ -166,7 +166,7 @@ assert(!Module['wasmMemory'], 'Use of `wasmMemory` detected.  Use -sIMPORTED_MEM
+ assert(!Module['INITIAL_MEMORY'], 'Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically');
+ #endif // !IMPORTED_MEMORY && ASSERTIONS
+
+-#if RELOCATABLE
++#if RELOCATABLE || MAIN_MODULE
+ var __RELOC_FUNCS__ = [];
+ #endif
+
+@@ -213,7 +213,7 @@ function initRuntime() {
+   setStackLimits();
+ #endif
+
+-#if RELOCATABLE
++#if MAIN_MODULE || RELOCATABLE
+   callRuntimeCallbacks(__RELOC_FUNCS__);
+ #endif
+
+@@ -849,7 +849,7 @@ function getWasmImports() {
+ #if SPLIT_MODULE
+     'placeholder': new Proxy({}, splitModuleProxyHandler),
+ #endif
+-#if RELOCATABLE
++#if MAIN_MODULE || RELOCATABLE
+     'GOT.mem': new Proxy(wasmImports, GOTHandler),
+     'GOT.func': new Proxy(wasmImports, GOTHandler),
+ #endif
+@@ -866,32 +866,33 @@ function getWasmImports() {
+   function receiveInstance(instance, module) {
+     wasmExports = instance.exports;
+
++#if MAIN_MODULE
++    // No relocation needed here.. but calling this just so that updateGOT is
++    // called.
+ #if RELOCATABLE
+-    wasmExports = relocateExports(wasmExports, {{{ GLOBAL_BASE }}});
++    var origExports = wasmExports = relocateExports(wasmExports, {{{ GLOBAL_BASE }}});
++#else
++    var origExports = wasmExports = relocateExports(wasmExports);
++#endif
+ #endif
+
+ #if ASYNCIFY
+     wasmExports = Asyncify.instrumentWasmExports(wasmExports);
+ #endif
+
+-#if ABORT_ON_WASM_EXCEPTIONS
+-    wasmExports = instrumentWasmExportsWithAbort(wasmExports);
+-#endif
+-
+ #if MAIN_MODULE
++    mergeLibSymbols(wasmExports, 'main')
+     var metadata = getDylinkMetadata(module);
+ #if AUTOLOAD_DYLIBS
+     if (metadata.neededDynlibs) {
+       dynamicLibraries = metadata.neededDynlibs.concat(dynamicLibraries);
+     }
+ #endif
+-    mergeLibSymbols(wasmExports, 'main')
+-#if '$LDSO' in addedLibraryItems
+-    LDSO.init();
+ #endif
+-    loadDylibs();
+-#elif RELOCATABLE
+-    reportUndefinedSymbols();
++
++
++#if ABORT_ON_WASM_EXCEPTIONS
++    wasmExports = instrumentWasmExportsWithAbort(wasmExports);
+ #endif
+
+ #if MEMORY64 || CAN_ADDRESS_2GB
+@@ -917,7 +918,7 @@ function getWasmImports() {
+     updateMemoryViews();
+ #endif
+
+-#if '$wasmTable' in addedLibraryItems && !RELOCATABLE
++#if '$wasmTable' in addedLibraryItems && !(RELOCATABLE || MAIN_MODULE)
+     wasmTable = wasmExports['__indirect_function_table'];
+     {{{ receivedSymbol('wasmTable') }}}
+ #if ASSERTIONS && !PURE_WASI
+@@ -929,6 +930,24 @@ function getWasmImports() {
+     __RELOC_FUNCS__.push(wasmExports['__wasm_apply_data_relocs']);
+ #endif
+
++#if MAIN_MODULE
++    updateGOT(origExports);
++#endif
++
++#if EXPORTED_RUNTIME_METHODS.includes('wasmExports')
++    Module['wasmExports'] = wasmExports;
++#endif
++
++#if MAIN_MODULE
++#if '$LDSO' in addedLibraryItems
++    LDSO.init();
++#endif
++    loadDylibs();
++#elif RELOCATABLE
++    reportUndefinedSymbols();
++#endif
++
++
+ #if ABORT_ON_WASM_EXCEPTIONS
+     instrumentWasmTableWithAbort();
+ #endif
+@@ -968,7 +987,7 @@ function getWasmImports() {
+     assert(Module === trueModule, 'the Module object should not be replaced during async compilation - perhaps the order of HTML elements is wrong?');
+     trueModule = null;
+ #endif
+-#if SHARED_MEMORY || RELOCATABLE
++#if SHARED_MEMORY || MAIN_MODULE
+     return receiveInstance(result['instance'], result['module']);
+ #else
+     // TODO: Due to Closure regression https://github.com/google/closure-compiler/issues/3193, the above line no longer optimizes out down to the following line.
+diff --git a/tools/building.py b/tools/building.py
+index 5006c2037..96ef45fcc 100644
+--- a/tools/building.py
++++ b/tools/building.py
+@@ -196,7 +196,7 @@ def lld_flags_for_executable(external_symbols):
+
+   cmd.extend(f'--export-if-defined={e}' for e in settings.EXPORT_IF_DEFINED)
+
+-  if settings.RELOCATABLE:
++  if settings.MAIN_MODULE or settings.RELOCATABLE:
+     cmd.append('--experimental-pic')
+     cmd.append('--unresolved-symbols=import-dynamic')
+     if not settings.WASM_BIGINT:
+@@ -205,6 +205,8 @@ def lld_flags_for_executable(external_symbols):
+       # shared libraries.  Because of this we need to disabled signature
+       # checking of shared library functions in this case.
+       cmd.append('--no-shlib-sigcheck')
++
++  if settings.RELOCATABLE:
+     if settings.SIDE_MODULE:
+       cmd.append('-shared')
+     else:
+@@ -269,6 +271,9 @@ def link_lld(args, target, external_symbols=None):
+     args.insert(0, '--whole-archive')
+     args.append('--no-whole-archive')
+
++  if settings.MAIN_MODULE:
++    args.insert(0, '-Bdynamic')
++
+   if settings.STRICT and '--no-fatal-warnings' not in args:
+     args.append('--fatal-warnings')
+
+@@ -1273,7 +1278,7 @@ def read_and_preprocess(filename, expand_macros=False):
+
+ def js_legalization_pass_flags():
+   flags = []
+-  if settings.RELOCATABLE:
++  if settings.RELOCATABLE or settings.MAIN_MODULE:
+     # When building in relocatable mode, we also want access the original
+     # non-legalized wasm functions (since wasm modules can and do link to
+     # the original, non-legalized, functions).
+diff --git a/tools/cache.py b/tools/cache.py
+index 445de535d..5a7c4982c 100644
+--- a/tools/cache.py
++++ b/tools/cache.py
+@@ -122,7 +122,7 @@ def get_lib_dir(absolute):
+       subdir.append('thinlto')
+     else:
+       subdir.append('lto')
+-  if settings.RELOCATABLE:
++  if settings.RELOCATABLE or settings.MAIN_MODULE:
+     subdir.append('pic')
+   if subdir:
+     path = Path(path, '-'.join(subdir))
+diff --git a/tools/emscripten.py b/tools/emscripten.py
+index d33b4c97c..1132af313 100644
+--- a/tools/emscripten.py
++++ b/tools/emscripten.py
+@@ -370,7 +370,7 @@ def emscript(in_wasm, out_wasm, outfile_js, js_syms, finalize=True, base_metadat
+
+   # memory and global initializers
+
+-  if settings.RELOCATABLE:
++  if settings.MAIN_MODULE or settings.RELOCATABLE:
+     dylink_sec = webassembly.parse_dylink_section(in_wasm)
+     static_bump = align_memory(dylink_sec.mem_size)
+     set_memory(static_bump)
+@@ -382,7 +382,7 @@ def emscript(in_wasm, out_wasm, outfile_js, js_syms, finalize=True, base_metadat
+     if settings.INITIAL_TABLE == -1:
+       settings.INITIAL_TABLE = dylink_sec.table_size + 1
+
+-    if settings.ASYNCIFY == 1:
++    if settings.MAIN_MODULE and settings.ASYNCIFY == 1:
+       metadata.imports += ['__asyncify_state', '__asyncify_data']
+
+   if metadata.invoke_funcs:
+@@ -897,7 +897,7 @@ def make_export_wrappers(function_exports):
+     # pthread_self and _emscripten_proxy_execute_task_queue are currently called in some
+     # cases after the runtime has exited.
+     # TODO: Look into removing these, and improving our robustness around thread termination.
+-    return sym not in {'__trap', 'pthread_self', '_emscripten_proxy_execute_task_queue'}
++    return sym not in {'__trap', 'pthread_self', '_emscripten_proxy_execute_task_queue', 'emscripten_get_sbrk_ptr'}
+
+   for name, types in function_exports.items():
+     nargs = len(types.params)
+@@ -1026,6 +1026,7 @@ def create_pointer_conversion_wrappers(metadata):
+   mapping = {
+     'sbrk': 'pP',
+     '_emscripten_stack_alloc': 'pp',
++    'emscripten_get_sbrk_ptr': 'p',
+     'emscripten_builtin_malloc': 'pp',
+     'emscripten_builtin_calloc': 'ppp',
+     'wasmfs_create_node_backend': 'pp',
+diff --git a/tools/link.py b/tools/link.py
+index f9a83a379..0d26f1292 100644
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -370,7 +370,7 @@ def get_binaryen_passes():
+     passes += ['--fpcast-emu']
+   if settings.ASYNCIFY == 1:
+     passes += ['--asyncify']
+-    if settings.MAIN_MODULE or settings.SIDE_MODULE:
++    if settings.RELOCATABLE or settings.MAIN_MODULE:
+       passes += ['--pass-arg=asyncify-relocatable']
+     if settings.ASSERTIONS:
+       passes += ['--pass-arg=asyncify-asserts']
+@@ -479,14 +479,9 @@ def get_worker_js_suffix():
+
+
+ def setup_pthreads():
+-  if settings.RELOCATABLE:
+-    # pthreads + dynamic linking has certain limitations
+-    if settings.SIDE_MODULE:
+-      diagnostics.warning('experimental', '-sSIDE_MODULE + pthreads is experimental')
+-    elif settings.MAIN_MODULE:
+-      diagnostics.warning('experimental', '-sMAIN_MODULE + pthreads is experimental')
+-    elif settings.LINKABLE:
+-      diagnostics.warning('experimental', '-sLINKABLE + pthreads is experimental')
++  # pthreads + dynamic linking has certain limitations
++  if settings.MAIN_MODULE or settings.RELOCATABLE:
++    diagnostics.warning('experimental', 'dynamic linking + pthreads is experimental')
+   if settings.ALLOW_MEMORY_GROWTH:
+     diagnostics.warning('pthreads-mem-growth', '-pthread + ALLOW_MEMORY_GROWTH may run non-wasm code slowly, see https://github.com/WebAssembly/design/issues/1271')
+
+@@ -1041,6 +1036,8 @@ def phase_linker_setup(options, linker_args):  # noqa: C901, PLR0912, PLR0915
+       settings.INCLUDE_FULL_LIBRARY = 1
+     # Called from preamble.js once the main module is instantiated.
+     settings.DEFAULT_LIBRARY_FUNCS_TO_INCLUDE += ['$loadDylibs']
++    if not settings.RELOCATABLE:
++      settings.REQUIRED_EXPORTS += ['__stack_pointer']
+
+   if settings.MAIN_MODULE == 1 or settings.SIDE_MODULE == 1:
+     settings.LINKABLE = 1
+@@ -1059,7 +1056,7 @@ def phase_linker_setup(options, linker_args):  # noqa: C901, PLR0912, PLR0915
+       '$registerTLSInit',
+     ]
+
+-  if settings.RELOCATABLE:
++  if settings.MAIN_MODULE or settings.RELOCATABLE:
+     settings.DEFAULT_LIBRARY_FUNCS_TO_INCLUDE += [
+       '$reportUndefinedSymbols',
+       '$relocateExports',
+@@ -1484,6 +1481,7 @@ def phase_linker_setup(options, linker_args):  # noqa: C901, PLR0912, PLR0915
+       not settings.AUTODEBUG and \
+       not settings.ASSERTIONS and \
+       not settings.RELOCATABLE and \
++      not settings.MAIN_MODULE and \
+       not settings.ASYNCIFY_LAZY_LOAD_CODE and \
+           settings.MINIFY_WASM_EXPORT_NAMES:
+     settings.MINIFY_WASM_IMPORTS_AND_EXPORTS = 1
+diff --git a/tools/system_libs.py b/tools/system_libs.py
+index 9b3a3c230..4c8012709 100644
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -64,8 +64,8 @@ def get_base_cflags(build_dir, force_object_files=False, preprocess=True):
+   flags = ['-g', '-sSTRICT', '-Werror']
+   if settings.LTO and not force_object_files:
+     flags += ['-flto=' + settings.LTO]
+-  if settings.RELOCATABLE:
+-    flags += ['-sRELOCATABLE']
++  if settings.RELOCATABLE or settings.MAIN_MODULE:
++    flags += ['-fPIC']
+     if preprocess:
+       flags += ['-DEMSCRIPTEN_DYNAMIC_LINKING']
+   if settings.MEMORY64:
+@@ -1319,7 +1319,7 @@ class libc(MuslInternalLibrary,
+           'system.c',
+         ])
+
+-    if settings.RELOCATABLE:
++    if settings.RELOCATABLE or settings.MAIN_MODULE:
+       libc_files += files_in_path(path='system/lib/libc', filenames=['dynlink.c'])
+
+     libc_files += files_in_path(
